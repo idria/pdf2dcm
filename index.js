@@ -14,6 +14,15 @@ const DailyRotateFile = require('winston-daily-rotate-file');
 
 const tmp = path.join(__dirname, "tmp");
 const backup = path.join(__dirname, "backup");
+
+if (!fs.existsSync(tmp)){
+    fs.mkdirSync(tmp);
+}
+
+if (!fs.existsSync(backup)){
+    fs.mkdirSync(backup);
+}
+
 const app = express();
 
 const logger = winston.createLogger({
