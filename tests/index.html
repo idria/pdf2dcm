@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en-US">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>PDF2DCM</title>
+	</head>
+	<body>
+		<input type="file" id="file-input" />
+		<br />
+		<br />
+		<label>Accession Number:&nbsp;</label><input type="text" id="AccessionNumber" value="R2020" /><br />
+		<label>Patient Name:&nbsp;</label><input type="text" id="PatientName" value="TEST^NAME" /><br />
+		<label>Patient ID:&nbsp;</label><input type="text" id="PatientID" value="123456" /><br />
+		<label>Patient Birth Date (YYYYMMDD):&nbsp;</label><input type="text" id="PatientBirthDate" /><br />
+		<label>Patient Sex (M, F o O):&nbsp;</label><input type="text" id="PatientSex" /><br />
+		<label>Study ID:&nbsp;</label><input type="text" id="StudyID" /><br />
+		<pre id="status"></pre>
+		<script>
+			function ajaxStatus(AccessionNumber, callback) {
+				var xmlhttp = new XMLHttpRequest();
+
+				xmlhttp.onreadystatechange = function() {
+					if (xmlhttp.readyState == XMLHttpRequest.DONE) {
+				    	if (xmlhttp.status == 200) {
+				        	callback(null, xmlhttp.responseText);
+						} else if (xmlhttp.status == 400) {
+							callback("Error 400");
+						} else if (xmlhttp.status == 500) {
+							callback("Server Error: "+xmlhttp.responseText);
+						} else {
+				        	callback("Unknown response "+xmlhttp.status);
+						}
+					}
+				};
+
+				xmlhttp.open("GET", "http://127.0.0.1:5000/api/v1/status/"+AccessionNumber, true);
+				xmlhttp.setRequestHeader('Access-Control-Allow-Origin', '*');
+				xmlhttp.send();
+			}
+
+			function checkStatus(AccessionNumber) {
+				let status = document.getElementById('status');
+
+				ajaxStatus(AccessionNumber, (err, data) => {
+					if(err === null) {
+						var json = JSON.parse(data);
+						console.log(json);
+
+						if(json.pdf) {
+							status.textContent = "Convirtiendo PDF a DICOM.";
+						}
+						if(json.pre) {
+							status.textContent = "Agregando identificacion del paciente al DICOM.";
+						}
+						if(json.dcm) {
+							status.textContent = "Subiendo archivo al PACS.";
+						}
+						if(json.err) {
+							status.textContent = "Se produjo un error.";
+						}
+						if(json.ok) {
+							status.textContent = "Archivo cargado!";
+						}
+
+						if(!(json.ok || json.err)) {
+							setTimeout(function(){ 
+								checkStatus(AccessionNumber);
+							}, 1000);
+						}
+					}else{
+						console.error(data);
+					}
+				});
+			}
+ 
+			function convertAndSend(contents) {
+				var xmlhttp = new XMLHttpRequest();
+				var b64 = window.btoa(unescape(encodeURIComponent(contents)));
+
+				var AccessionNumber = document.getElementById('AccessionNumber').value;
+				var PatientName = document.getElementById('PatientName').value;
+				var PatientID = document.getElementById('PatientID').value;
+				var PatientBirthDate = document.getElementById('PatientBirthDate').value;
+				var PatientSex = document.getElementById('PatientSex').value;
+				var StudyID = document.getElementById('StudyID').value;
+
+				var json = new Object();
+				json.DICOM = new Object();
+				json.PDF = b64;
+
+				if(AccessionNumber !== "") { json.DICOM.AccessionNumber = AccessionNumber; }
+				if(PatientName !== "") { json.DICOM.PatientName = PatientName; }
+				if(PatientID !== "") { json.DICOM.PatientID = PatientID; }
+				if(PatientBirthDate !== "") { json.DICOM.PatientBirthDate = PatientBirthDate; }
+				if(PatientSex !== "") { json.DICOM.PatientSex = PatientSex; }
+				if(StudyID !== "") { json.DICOM.StudyID = StudyID; }
+
+				xmlhttp.onreadystatechange = function() {
+					if (xmlhttp.readyState == XMLHttpRequest.DONE) {
+				    	if (xmlhttp.status == 200) {
+				        	checkStatus(AccessionNumber);
+						} else if (xmlhttp.status == 400) {
+							console.log("Error 400");
+						} else if (xmlhttp.status == 500) {
+							console.log("Server Error: "+xmlhttp.responseText);
+						} else {
+				        	console.log("Unknown response "+xmlhttp.status);
+						}
+					}
+				};
+
+				xmlhttp.open("POST", "http://127.0.0.1:5000/api/v1/convert", true);
+				xmlhttp.setRequestHeader('Access-Control-Allow-Origin', '*');
+				xmlhttp.setRequestHeader("Content-Type", "application/json");
+				xmlhttp.send(JSON.stringify(json));
+			}
+
+			function readFile(e) {
+				var file = e.target.files[0];
+			 	if (!file) return;
+			 	var reader = new FileReader();
+			 	reader.onload = function(e) {
+					var contents = e.target.result;
+					convertAndSend(contents);
+				};
+			 	reader.readAsText(file);
+			}
+
+			document.getElementById('file-input').addEventListener('change', readFile, false);
+		</script>
+	</body>
+</html>

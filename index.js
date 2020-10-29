@@ -4,13 +4,14 @@ const DICOM_PORT = 4242;
 const DICOM_HOST = "127.0.0.1";
 ///////////////////////////////////
 const SEARCH_TIMEOUT = 5000;
-const CLEANUP_TIMEOUT = 10;
+const CLEANUP_TIMEOUT = 50000;
 const CLEANUP_FILE_AGE = 5;
 ///////////////////////////////////
 
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const cors = require('cors');
 const async = require('async');
 const execFile = require('child_process').execFile;
 const winston = require('winston');
@@ -326,6 +327,7 @@ cleanup();
 app.use(express.json({
 	limit: '100mb'
 }));
+app.use(cors());
 
 app.get('/api/ping', (req, res) => {
 	logger.info('info', 'Test OK.');
@@ -350,28 +352,66 @@ app.get('/api/v1/status/:id', (req, res) => {
 app.post('/api/v1/convert', (req, res) => {
 	let dicom = req.body.DICOM;
 	let base64PDF = req.body.PDF;
+	let dicomFiltered = new Object();
 
 	if(dicom.AccessionNumber === undefined) {
 		const mes = "Falta campo AccessionNumber!";
 		logger.log("error", mes); 
 		res.status(500).send(mes);
+		return;
+	}else{
+		dicomFiltered.AccessionNumber = dicom.AccessionNumber;
 	}
 
 	if(dicom.PatientName === undefined) {
 		const mes = "Falta campo PatientName!";
 		logger.log("error", mes); 
 		res.status(500).send(mes);
+		return;
+	}else{
+		dicomFiltered.PatientName = dicom.PatientName;
 	}
 
 	if(dicom.PatientID === undefined) {
 		const mes = "Falta campo PatientID!";
 		logger.log("error", mes); 
 		res.status(500).send(mes);
+		return;
+	}else{
+		dicomFiltered.PatientID = dicom.PatientID;
 	}
 
-	fs.writeFile(path.join(tmp, dicom.AccessionNumber + '.pdf'), base64PDF, {encoding: 'base64'}, function(err) {
+	if(dicom.PatientBirthDate !== undefined) {
+		let year = dicom.PatientBirthDate.substring(0, 4);
+		let month = dicom.PatientBirthDate.substring(4, 6);
+		let day = dicom.PatientBirthDate.substring(6, 8);
+
+		var timestamp = Date.parse(day+'/'+month+'/'+year);
+
+		if (isNaN(timestamp)) {
+			const mes = "Fecha PatientBirthDate invalida!";
+			logger.log("error", mes); 
+			res.status(500).send(mes);
+			return;
+		}else{
+			dicomFiltered.PatientBirthDate = dicom.PatientBirthDate;
+		}
+	}
+
+	if(dicom.PatientSex !== undefined) {
+		if(dicom.PatientSex === 'M' || dicom.PatientSex === 'F' || dicom.PatientSex === 'O') {
+			dicomFiltered.PatientSex = dicom.PatientSex;
+		}else{
+			const mes = "Valor de PatientSex invalido!";
+			logger.log("error", mes); 
+			res.status(500).send(mes);
+			return;
+		}
+	}
+
+	fs.writeFile(path.join(tmp, dicomFiltered.AccessionNumber + '.pdf'), base64PDF, {encoding: 'base64'}, function(err) {
 		if(err===null) {
-			fs.writeFile(path.join(tmp, dicom.AccessionNumber + '.json'), JSON.stringify(dicom), function(err) {
+			fs.writeFile(path.join(tmp, dicomFiltered.AccessionNumber + '.json'), JSON.stringify(dicomFiltered), function(err) {
 				if(err===null) {
 					logger.log('info', 'Ingreso de PDF nuevo.');
 					res.send('');
@@ -379,16 +419,18 @@ app.post('/api/v1/convert', (req, res) => {
 					const mes = 'Error al generar JSON.';
 					logger.log('error', mes); 
 					res.status(500).send(mes);
+					return;
 				}
 			});
 		}else{
 			const mes = 'Error al generar PDF.';
 			logger.log('error', mes); 
 			res.status(500).send(mes);
+			return;
 		}
 	});
 });
 
 app.listen(WEB_PORT, () => {
-	logger.log('info', 'Escuchando en http://localhost: '+WEB_PORT);
+	logger.log('info', 'Escuchando en http://localhost:'+WEB_PORT);
 });
