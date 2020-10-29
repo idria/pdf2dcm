@@ -35,10 +35,11 @@ index.js
 
 - /api/v1/convert
 
-`{`
-`    "DICOM": {`
-`        "PatientName": "PATIENT^NAME",`
-`        "PatientID": 2020202,`
+```
+{
+    "DICOM": {
+        "PatientName": "PATIENT^NAME",
+        "PatientID": 2020202,
         "AccessionNumber": "PRUEBAX",
         "PatientBirthDate": "19861126",		// YYYYMMDD
         "patientSex": "M",					// M, F, O
@@ -46,13 +47,16 @@ index.js
     },
     "PDF": "<BASE64>"
 }
+```
 
 - /api/v1/status/:id
 
-`{
+```
+{
 	"pdf": BOOL,
 	"pre": BOOL,
 	"dcm": BOOL,
 	"err": BOOL,
 	"ok": BOOL,
-}`
+}
+```
