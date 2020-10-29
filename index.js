@@ -49,76 +49,6 @@ if (!fs.existsSync(error)){
     fs.mkdirSync(error);
 }
 
-app.use(express.json({
-	limit: '100mb'
-}));
-
-app.get('/ping', (req, res) => {
-	logger.info('info', 'Test OK.');
-	res.send('ok');
-});
-
-app.get('/status/:id', (req, res) => {
-	let accessionNumber = req.params.id;
-	let tempFile = path.join(__dirname, 'tmp', accessionNumber);
-	let errorFile = path.join(__dirname, 'error', accessionNumber);
-	let backupFile = path.join(__dirname, 'backup', accessionNumber);
-
-	res.json({
-		"pdf": fs.existsSync(tempFile + '.pdf'),
-		"pre": fs.existsSync(tempFile + '.pre'),
-		"dcm": fs.existsSync(tempFile + '.dcm'),
-		"err": fs.existsSync(errorFile + '.dcm'),
-		"ok": fs.existsSync(backupFile + '.dcm'),
-	});
-});
-
-app.post('/convert', (req, res) => {
-	let dicom = req.body.DICOM;
-	let base64PDF = req.body.PDF;
-
-	if(dicom.AccessionNumber === undefined) {
-		const mes = "Falta campo AccessionNumber!";
-		logger.log("error", mes); 
-		res.status(500).send(mes);
-	}
-
-	if(dicom.PatientName === undefined) {
-		const mes = "Falta campo PatientName!";
-		logger.log("error", mes); 
-		res.status(500).send(mes);
-	}
-
-	if(dicom.PatientID === undefined) {
-		const mes = "Falta campo PatientID!";
-		logger.log("error", mes); 
-		res.status(500).send(mes);
-	}
-
-	fs.writeFile(path.join(tmp, dicom.AccessionNumber + '.pdf'), base64PDF, {encoding: 'base64'}, function(err) {
-		if(err===null) {
-			fs.writeFile(path.join(tmp, dicom.AccessionNumber + '.json'), JSON.stringify(dicom), function(err) {
-				if(err===null) {
-					logger.log('info', 'Ingreso de PDF nuevo.');
-					res.send('');
-				}else{
-					const mes = 'Error al generar JSON.';
-					logger.log('error', mes); 
-					res.status(500).send(mes);
-				}
-			});
-		}else{
-			const mes = 'Error al generar PDF.';
-			logger.log('error', mes); 
-			res.status(500).send(mes);
-		}
-	});
-});
-
-app.listen(WEB_PORT, () => {
-	logger.log('info', 'Escuchando en http://localhost: '+WEB_PORT);
-});
-
 // Convierte PDF a .pre (DICOM sin tags de identificacion)
 function PDF(files, pdf_cb) {
 	let pdfs = files.filter(fileName => fileName.substr(fileName.lastIndexOf('.') + 1) === 'pdf' );
@@ -392,3 +322,73 @@ function cleanup() {
 
 search();
 cleanup();
+
+app.use(express.json({
+	limit: '100mb'
+}));
+
+app.get('/api/ping', (req, res) => {
+	logger.info('info', 'Test OK.');
+	res.send('ok');
+});
+
+app.get('/api/v1/status/:id', (req, res) => {
+	let accessionNumber = req.params.id;
+	let tempFile = path.join(__dirname, 'tmp', accessionNumber);
+	let errorFile = path.join(__dirname, 'error', accessionNumber);
+	let backupFile = path.join(__dirname, 'backup', accessionNumber);
+
+	res.json({
+		"pdf": fs.existsSync(tempFile + '.pdf'),
+		"pre": fs.existsSync(tempFile + '.pre'),
+		"dcm": fs.existsSync(tempFile + '.dcm'),
+		"err": fs.existsSync(errorFile + '.dcm'),
+		"ok": fs.existsSync(backupFile + '.dcm'),
+	});
+});
+
+app.post('/api/v1/convert', (req, res) => {
+	let dicom = req.body.DICOM;
+	let base64PDF = req.body.PDF;
+
+	if(dicom.AccessionNumber === undefined) {
+		const mes = "Falta campo AccessionNumber!";
+		logger.log("error", mes); 
+		res.status(500).send(mes);
+	}
+
+	if(dicom.PatientName === undefined) {
+		const mes = "Falta campo PatientName!";
+		logger.log("error", mes); 
+		res.status(500).send(mes);
+	}
+
+	if(dicom.PatientID === undefined) {
+		const mes = "Falta campo PatientID!";
+		logger.log("error", mes); 
+		res.status(500).send(mes);
+	}
+
+	fs.writeFile(path.join(tmp, dicom.AccessionNumber + '.pdf'), base64PDF, {encoding: 'base64'}, function(err) {
+		if(err===null) {
+			fs.writeFile(path.join(tmp, dicom.AccessionNumber + '.json'), JSON.stringify(dicom), function(err) {
+				if(err===null) {
+					logger.log('info', 'Ingreso de PDF nuevo.');
+					res.send('');
+				}else{
+					const mes = 'Error al generar JSON.';
+					logger.log('error', mes); 
+					res.status(500).send(mes);
+				}
+			});
+		}else{
+			const mes = 'Error al generar PDF.';
+			logger.log('error', mes); 
+			res.status(500).send(mes);
+		}
+	});
+});
+
+app.listen(WEB_PORT, () => {
+	logger.log('info', 'Escuchando en http://localhost: '+WEB_PORT);
+});
