@@ -35,7 +35,7 @@ index.js
 
 - /api/v1/convert
 
-{
+`{
     "DICOM": {
         "PatientName": "PATIENT^NAME",
         "PatientID": 2020202,
@@ -45,14 +45,14 @@ index.js
         "StudyID": "A2020"
     },
     "PDF": "<BASE64>"
-}
+}`
 
 - /api/v1/status/:id
 
-{
+`{
 	"pdf": BOOL,
 	"pre": BOOL,
 	"dcm": BOOL,
 	"err": BOOL,
 	"ok": BOOL,
-}
+}`
