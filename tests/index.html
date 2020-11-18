@@ -84,6 +84,7 @@
 				var PatientBirthDate = document.getElementById('PatientBirthDate').value;
 				var PatientSex = document.getElementById('PatientSex').value;
 				var StudyID = document.getElementById('StudyID').value;
+				var StudyDate = document.getElementById('StudyDate').value;
 
 				var json = new Object();
 				json.DICOM = new Object();
@@ -95,6 +96,7 @@
 				if(PatientBirthDate !== "") { json.DICOM.PatientBirthDate = PatientBirthDate; }
 				if(PatientSex !== "") { json.DICOM.PatientSex = PatientSex; }
 				if(StudyID !== "") { json.DICOM.StudyID = StudyID; }
+				if(StudyDate !== "") { json.DICOM.StudyDate = StudyDate; }
 
 				xmlhttp.onreadystatechange = function() {
 					if (xmlhttp.readyState == XMLHttpRequest.DONE) {

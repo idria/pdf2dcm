@@ -119,6 +119,9 @@ function PRE(files, pre_cb) {
 			let patientBirthDateTag;
 			let patientSexTag;
 			let studyIDTag;
+			let studyDateTag;
+
+			let dicomTags = [];
 
 			if(err) {
 				logger.log('error', err);
@@ -127,55 +130,54 @@ function PRE(files, pre_cb) {
 
 			let jsonData = JSON.parse(rawJsonData);
 
-			if(jsonData.AccessionNumber === undefined) {
-				accessionNumberTag = '';
-			}else{
+			if(jsonData.AccessionNumber !== undefined) {
 				accessionNumberTag = jsonData.AccessionNumber;
+				dicomTags.push('-i');
+				dicomTags.push("(0008,0050)="+accessionNumberTag);
 			}
 
-			if(jsonData.PatientName === undefined) {
-				patientNameTag = '';
-			}else{
+			if(jsonData.PatientName !== undefined) {
 				patientNameTag = jsonData.PatientName;
+				dicomTags.push('-i');
+				dicomTags.push("(0010,0010)="+patientNameTag);
 			}
 
-			if(jsonData.PatientID === undefined) {
-				patientIDTag = '';
-			}else{
+			if(jsonData.PatientID !== undefined) {
 				patientIDTag = jsonData.PatientID;
+				dicomTags.push('-i');
+				dicomTags.push("(0010,0020)="+patientIDTag);
 			}
 
-			if(jsonData.PatientBirthDate === undefined) {
-				patientBirthDateTag = '';
-			}else{
+			if(jsonData.PatientBirthDate !== undefined) {
 				patientBirthDateTag = jsonData.PatientBirthDate;
+				dicomTags.push('-i');
+				dicomTags.push("(0010,0030)="+patientBirthDateTag);
 			}
 
-			if(jsonData.PatientSex === undefined) {
-				patientSexTag = '';
-			}else{
+			if(jsonData.PatientSex !== undefined) {
 				patientSexTag = jsonData.PatientSex;
+				dicomTags.push('-i');
+				dicomTags.push("(0010,0040)="+patientSexTag);
 			}
 
-			if(jsonData.StudyID === undefined) {
-				studyIDTag = '';
-			}else{
+			if(jsonData.StudyID !== undefined) {
 				studyIDTag = jsonData.StudyID;
+				dicomTags.push('-i');
+				dicomTags.push("(0020,0010)="+studyIDTag);
 			}
+
+			if(jsonData.StudyDate !== undefined) {
+				studyDateTag = jsonData.StudyDate;
+				dicomTags.push('-i');
+				dicomTags.push("(0008,0020)="+studyDateTag);
+			}
+
+			dicomTags.push(inputFile);
 
 			logger.log('info', 'DCMODIFY Convirtiendo.. ('+inputFile+')');
 
 			execFile(
-				path.join(__dirname, 'dcmtk', 'dcmodify.exe'), 
-				[
-					'-i', "(0008,0050)="+accessionNumberTag, 
-					'-i', "(0010,0010)="+patientNameTag,
-					'-i', "(0010,0020)="+patientIDTag,
-					'-i', "(0010,0030)="+patientBirthDateTag,
-					'-i', "(0010,0040)="+patientSexTag,
-					'-i', "(0020,0010)="+studyIDTag,
-					inputFile
-				], 
+				path.join(__dirname, 'dcmtk', 'dcmodify.exe'), dicomTags, 
 				function(err, data) {
 			    	if(err === null) {
 					 	fs.rename(inputFile, outputFile, function(err) {
@@ -382,20 +384,11 @@ app.post('/api/v1/convert', (req, res) => {
 	}
 
 	if(dicom.PatientBirthDate !== undefined) {
-		let year = dicom.PatientBirthDate.substring(0, 4);
-		let month = dicom.PatientBirthDate.substring(4, 6);
-		let day = dicom.PatientBirthDate.substring(6, 8);
+		dicomFiltered.PatientBirthDate = dicom.PatientBirthDate;
+	}
 
-		var timestamp = Date.parse(day+'/'+month+'/'+year);
-
-		if (isNaN(timestamp)) {
-			const mes = "Fecha PatientBirthDate invalida!";
-			logger.log("error", mes); 
-			res.status(500).send(mes);
-			return;
-		}else{
-			dicomFiltered.PatientBirthDate = dicom.PatientBirthDate;
-		}
+	if(dicom.StudyDate !== undefined) {
+		dicomFiltered.StudyDate = dicom.StudyDate;
 	}
 
 	if(dicom.PatientSex !== undefined) {
