@@ -16,6 +16,8 @@ const async = require('async');
 const execFile = require('child_process').execFile;
 const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
+const { createLogger, format, transports } = require('winston');
+const { combine, timestamp, label, printf } = format;
 
 const tmp = path.join(__dirname, 'tmp');
 const backup = path.join(__dirname, 'backup');
@@ -23,9 +25,16 @@ const error = path.join(__dirname, 'error');
 
 const app = express();
 
+const myFormat = printf(({ level, message, timestamp }) => {
+  return `${timestamp} ${level}: ${message}`;
+});
+
 const logger = winston.createLogger({
   level: 'info',
-  format: winston.format.json(),
+  format: combine(
+    timestamp(),
+    myFormat
+  ),
   transports: [
     new winston.transports.Console(),
     new DailyRotateFile({
@@ -332,8 +341,9 @@ app.use(express.json({
 app.use(cors());
 
 app.get('/api/ping', (req, res) => {
-	logger.info('info', 'Test OK.');
-	res.send('ok');
+	res.json({
+		"status": "ok"
+	});
 });
 
 app.get('/api/v1/status/:id', (req, res) => {
