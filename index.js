@@ -49,242 +49,279 @@ const logger = winston.createLogger({
 
 if (!fs.existsSync(tmp)){
     fs.mkdirSync(tmp);
+	logger.log('info', 'Se creo la carpeta tmp.');
 }
 
 if (!fs.existsSync(backup)){
     fs.mkdirSync(backup);
+	logger.log('info', 'Se creo la carpeta backup.');
 }
 
 if (!fs.existsSync(error)){
     fs.mkdirSync(error);
+	logger.log('info', 'Se creo la carpeta tmp.');
 }
+
+// delete all files from a folder
+const removeDir = function(path) {
+	if (fs.existsSync(path)) {
+		const files = fs.readdirSync(path);
+  
+		if (files.length > 0) {
+			files.forEach(function(filename) {
+				if (fs.statSync(path + "/" + filename).isDirectory()) {
+					removeDir(path + "/" + filename)
+				} else {
+					fs.unlinkSync(path + "/" + filename)
+				}
+			})
+		} else {
+			logger.log('info', 'removeDir: Sin archivos en el directorio.');
+		}
+	} else {
+		logger.log('error', 'removeDir: No existe el directorio.');
+	}
+}
+
+logger.log('info', 'Borrando archivos temporales..');
+removeDir(tmp);
 
 // Convierte PDF a .pre (DICOM sin tags de identificacion)
 function PDF(files, pdf_cb) {
-	let pdfs = files.filter(fileName => fileName.substr(fileName.lastIndexOf('.') + 1) === 'pdf' );
+	try {
+		let pdfs = files.filter(fileName => fileName.substr(fileName.lastIndexOf('.') + 1) === 'pdf' );
 
-	async.eachSeries(pdfs, function(item, pdf_item_cb) {
-		let inputFile = path.join(tmp, item);
-		let errorFile = path.join(error, item);
-		let outputFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".pre");
-		let jsonFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".json");
+		async.eachSeries(pdfs, function(item, pdf_item_cb) {
+			let inputFile = path.join(tmp, item);
+			let errorFile = path.join(error, item);
+			let outputFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".pre");
+			let jsonFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".json");
 
-		logger.log('info', 'PDF2DCM Convirtiendo.. ('+inputFile+')');
+			logger.log('info', 'PDF2DCM Convirtiendo.. ('+inputFile+')');
 
-		execFile(
-			path.join(__dirname, 'dcmtk', 'pdf2dcm.exe'), 
-			[inputFile, outputFile], 
-			function(err, data) {
-		    	if(err === null) {
-				 	fs.unlink(inputFile, function(err) {
-				 		if(err) logger.log('error', mes);
-				 		pdf_item_cb(null);
-				 	});
-				 	logger.log('info', 'PDF2DCM OK. ('+inputFile+')');
-		    	}else{
-		    		logger.log('error', 'Error al ejecutar pdf2dcm.exe. '+data);
-		    		// si archivo invalido lo muevo a err
-					async.parallel([
-					    function(callback1) {
-					    	logger.log('info', 'Moviendo archivo a error: '+inputFile);
-				    		fs.rename(inputFile, errorFile, function(err) {
-								if(err) logger.log('error', err);
-								callback1(null);
-				    		});
-					    },
-					    function(callback2) {
-					    	logger.log('error', 'Borrando archivo: '+jsonFile);
-					    	fs.unlink(jsonFile, function(err) {
-								if(err) logger.log('error', err);
-								callback2(null);
-							});
-					    }
-					], function(err, results) {
-						pdf_item_cb(null);
-					});
-		    	}
-	    	}
-	    );
-	}, function done() {
-		pdf_cb(null);
-	});
+			execFile(
+				path.join(__dirname, 'dcmtk', 'pdf2dcm.exe'), 
+				[inputFile, outputFile], 
+				function(err, data) {
+					if(err === null) {
+						fs.unlink(inputFile, function(err) {
+							if(err) logger.log('error', 'Unlink #1:' + err);
+							pdf_item_cb(null);
+						});
+						logger.log('info', 'PDF2DCM OK. ('+inputFile+')');
+					}else{
+						logger.log('error', 'Error al ejecutar pdf2dcm.exe. '+data);
+						// si archivo invalido lo muevo a err
+						async.parallel([
+							function(callback1) {
+								logger.log('info', 'Moviendo archivo a error: '+inputFile);
+								fs.rename(inputFile, errorFile, function(err) {
+									if(err) logger.log('error', 'Unlink #2:' + err);
+									callback1(null);
+								});
+							},
+							function(callback2) {
+								logger.log('error', 'Borrando archivo: '+jsonFile);
+								fs.unlink(jsonFile, function(err) {
+									if(err) logger.log('error', 'Unlink #3:' + err);
+									callback2(null);
+								});
+							}
+						], function(err, results) {
+							pdf_item_cb(null);
+						});
+					}
+				}
+			);
+		}, function done() {
+			pdf_cb(null);
+		});
+	} catch (err) {
+		logger.log('error', 'TryCatch PDF:' + err);
+	}
 }
 
 // Convierte .pre a .dcm (DICOM con identificacion)
 function PRE(files, pre_cb) {
-	let pre = files.filter(fileName => fileName.substr(fileName.lastIndexOf('.') + 1) === 'pre' );
+	try {
+		let pre = files.filter(fileName => fileName.substr(fileName.lastIndexOf('.') + 1) === 'pre' );
 
-	async.eachSeries(pre, function(item, pre_item_cb) {
-		let inputFile = path.join(tmp, item);
-		let errorFile = path.join(error, item);
-		let outputFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".dcm");
-		let jsonFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".json");
+		async.eachSeries(pre, function(item, pre_item_cb) {
+			let inputFile = path.join(tmp, item);
+			let errorFile = path.join(error, item);
+			let outputFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".dcm");
+			let jsonFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".json");
 
-		// lee archivo JSON con datos DICOM
-		fs.readFile(jsonFile, function(err, rawJsonData) {
-			let accessionNumberTag;
-			let patientNameTag;
-			let patientIDTag;
-			let patientBirthDateTag;
-			let patientSexTag;
-			let studyIDTag;
-			let studyDateTag;
+			// lee archivo JSON con datos DICOM
+			fs.readFile(jsonFile, function(err, rawJsonData) {
+				let accessionNumberTag;
+				let patientNameTag;
+				let patientIDTag;
+				let patientBirthDateTag;
+				let patientSexTag;
+				let studyIDTag;
+				let studyDateTag;
 
-			let dicomTags = [];
+				let dicomTags = [];
 
-			if(err) {
-				logger.log('error', err);
-			    pre_item_cb(null);
-			}
+				if(err) {
+					logger.log('error', 'PRE readfile' + err);
+					pre_item_cb(null);
+				}
 
-			let jsonData = JSON.parse(rawJsonData);
+				let jsonData = JSON.parse(rawJsonData);
 
-			if(jsonData.AccessionNumber !== undefined) {
-				accessionNumberTag = jsonData.AccessionNumber;
-				dicomTags.push('-i');
-				dicomTags.push("(0008,0050)="+accessionNumberTag);
-			}
+				if(jsonData.AccessionNumber !== undefined) {
+					accessionNumberTag = jsonData.AccessionNumber;
+					dicomTags.push('-i');
+					dicomTags.push("(0008,0050)="+accessionNumberTag);
+				}
 
-			if(jsonData.PatientName !== undefined) {
-				patientNameTag = jsonData.PatientName;
-				dicomTags.push('-i');
-				dicomTags.push("(0010,0010)="+patientNameTag);
-			}
+				if(jsonData.PatientName !== undefined) {
+					patientNameTag = jsonData.PatientName;
+					dicomTags.push('-i');
+					dicomTags.push("(0010,0010)="+patientNameTag);
+				}
 
-			if(jsonData.PatientID !== undefined) {
-				patientIDTag = jsonData.PatientID;
-				dicomTags.push('-i');
-				dicomTags.push("(0010,0020)="+patientIDTag);
-			}
+				if(jsonData.PatientID !== undefined) {
+					patientIDTag = jsonData.PatientID;
+					dicomTags.push('-i');
+					dicomTags.push("(0010,0020)="+patientIDTag);
+				}
 
-			if(jsonData.PatientBirthDate !== undefined) {
-				patientBirthDateTag = jsonData.PatientBirthDate;
-				dicomTags.push('-i');
-				dicomTags.push("(0010,0030)="+patientBirthDateTag);
-			}
+				if(jsonData.PatientBirthDate !== undefined) {
+					patientBirthDateTag = jsonData.PatientBirthDate;
+					dicomTags.push('-i');
+					dicomTags.push("(0010,0030)="+patientBirthDateTag);
+				}
 
-			if(jsonData.PatientSex !== undefined) {
-				patientSexTag = jsonData.PatientSex;
-				dicomTags.push('-i');
-				dicomTags.push("(0010,0040)="+patientSexTag);
-			}
+				if(jsonData.PatientSex !== undefined) {
+					patientSexTag = jsonData.PatientSex;
+					dicomTags.push('-i');
+					dicomTags.push("(0010,0040)="+patientSexTag);
+				}
 
-			if(jsonData.StudyID !== undefined) {
-				studyIDTag = jsonData.StudyID;
-				dicomTags.push('-i');
-				dicomTags.push("(0020,0010)="+studyIDTag);
-			}
+				if(jsonData.StudyID !== undefined) {
+					studyIDTag = jsonData.StudyID;
+					dicomTags.push('-i');
+					dicomTags.push("(0020,0010)="+studyIDTag);
+				}
 
-			if(jsonData.StudyDate !== undefined) {
-				studyDateTag = jsonData.StudyDate;
-				dicomTags.push('-i');
-				dicomTags.push("(0008,0020)="+studyDateTag);
-			}
+				if(jsonData.StudyDate !== undefined) {
+					studyDateTag = jsonData.StudyDate;
+					dicomTags.push('-i');
+					dicomTags.push("(0008,0020)="+studyDateTag);
+				}
 
-			dicomTags.push(inputFile);
+				dicomTags.push(inputFile);
 
-			logger.log('info', 'DCMODIFY Convirtiendo.. ('+inputFile+')');
+				logger.log('info', 'DCMODIFY Convirtiendo.. ('+inputFile+')');
 
-			execFile(
-				path.join(__dirname, 'dcmtk', 'dcmodify.exe'), dicomTags, 
-				function(err, data) {
-			    	if(err === null) {
-					 	fs.rename(inputFile, outputFile, function(err) {
-					 		if(err === null) {
-					 			pre_item_cb(null);
-					 		}else{
-					 			logger.log('error', 'Error al mover archivo: '+inputFile);
-					 			pre_item_cb(null);
-					 		}
-					 	});
+				execFile(
+					path.join(__dirname, 'dcmtk', 'dcmodify.exe'), dicomTags, 
+					function(err, data) {
+						if(err === null) {
+							fs.rename(inputFile, outputFile, function(err) {
+								if(err === null) {
+									pre_item_cb(null);
+								}else{
+									logger.log('error', 'Error al mover archivo: '+inputFile);
+									pre_item_cb(null);
+								}
+							});
 
-					 	logger.log('info', 'DCMODIFY OK. ('+inputFile+')');
-			    	}else{
-			    		logger.log('error', 'Error al ejecutar dcmodify.exe. '+data);
-			    		// si archivo invalido lo muevo a err
-						async.parallel([
-						    function(callback1) {
-						    	logger.log('error', 'Moviendo archivo a error: '+inputFile);
-					    		fs.rename(inputFile, errorFile, function(err) {
-									if(err) logger.log('error', err);
-									callback1(null);
-					    		});
-						    },
-						    function(callback2) {
-						    	logger.log('error', 'Borrando archivo: '+jsonFile);
-						    	fs.unlink(jsonFile, function(err) {
-									if(err) logger.log('error', err);
-									callback2(null);
-								});
-						    }
-						], function(err, results) {
-							pre_item_cb(null);
-						});
-			    	}
-		    	}
-		    );
+							logger.log('info', 'DCMODIFY OK. ('+inputFile+')');
+						}else{
+							logger.log('error', 'Error al ejecutar dcmodify.exe. '+data);
+							// si archivo invalido lo muevo a err
+							async.parallel([
+								function(callback1) {
+									logger.log('error', 'Moviendo archivo a error: '+inputFile);
+									fs.rename(inputFile, errorFile, function(err) {
+										if(err) logger.log('error', 'Rename #1:' + err);
+										callback1(null);
+									});
+								},
+								function(callback2) {
+									logger.log('error', 'Borrando archivo: '+jsonFile);
+									fs.unlink(jsonFile, function(err) {
+										if(err) logger.log('error', 'Unlink #4:' + err);
+										callback2(null);
+									});
+								}
+							], function(err, results) {
+								pre_item_cb(null);
+							});
+						}
+					}
+				);
+			});
+		}, function done() {
+			pre_cb(null);
 		});
-	}, function done() {
-		pre_cb(null);
-	});
+	} catch (err) {
+		logger.log('error', 'Try Catch:' + err);
+	}
 }
 
 // Envia .dcm a servidor DICOM
 function DCM(files, dcm_cb) {
-	let dcm = files.filter(fileName => fileName.substr(fileName.lastIndexOf('.') + 1 ) === 'dcm' );
+	try {
+		let dcm = files.filter(fileName => fileName.substr(fileName.lastIndexOf('.') + 1 ) === 'dcm' );
 
-	async.eachSeries(dcm, function(item, dcm_item_cb) {
-		let inputFile = path.join(tmp, item);
-		let backupFile = path.join(backup, item);
-
-		let preBakFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".pre.bak");
-		let jsonFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".json");
-
-		logger.log('info', 'DCMSEND Enviando.. ('+inputFile+')');
-
-		execFile(
-			path.join(__dirname, 'dcmtk', 'dcmsend.exe'), 
-			[DICOM_HOST, DICOM_PORT, inputFile], 
-			(err, stdout, stderr) => {
-				if(err === null) {
-					// mueve .dcm a carpeta backup
-					fs.rename(inputFile, backupFile, function(err) {
-						if(err === null) {
-
-							// borro .bak.pre y .json
-							async.parallel([
-							    function(callback1) {
-									fs.unlink(preBakFile, function(err) {
-										if(err) logger.log('error', err);
-										callback1(null);
-									});
-							    },
-							    function(callback2) {
-							    	fs.unlink(jsonFile, function(err) {
-										if(err) logger.log('error', err);
-										callback2(null);
-									});
-							    }
-							], function(err, results) {
+		async.eachSeries(dcm, function(item, dcm_item_cb) {
+			let inputFile = path.join(tmp, item);
+			let backupFile = path.join(backup, item);
+	
+			let preBakFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".pre.bak");
+			let jsonFile = path.join(tmp, item.split('.').slice(0, -1).join('.') + ".json");
+	
+			logger.log('info', 'DCMSEND Enviando.. ('+inputFile+')');
+	
+			execFile(
+				path.join(__dirname, 'dcmtk', 'dcmsend.exe'), 
+				[DICOM_HOST, DICOM_PORT, inputFile], 
+				(err, stdout, stderr) => {
+					if(err === null) {
+						// mueve .dcm a carpeta backup
+						fs.rename(inputFile, backupFile, function(err) {
+							if(err === null) {
+								// borro .bak.pre y .json
+								async.parallel([
+									function(callback1) {
+										fs.unlink(preBakFile, function(err) {
+											if(err) logger.log('error', 'Unlink #5:' + err);
+											callback1(null);
+										});
+									},
+									function(callback2) {
+										fs.unlink(jsonFile, function(err) {
+											if(err) logger.log('error', 'Unlink #6:' + err);
+											callback2(null);
+										});
+									}
+								], function(err, results) {
+									dcm_item_cb(null);
+								});
+							}else{
+								logger.log('error', err);
 								dcm_item_cb(null);
-							});
-
-						}else{
-							logger.log('error', err);
-							dcm_item_cb(null);
-						}
-					});
-
-					logger.log('info', 'DCMSEND OK. ('+inputFile+')');
-				}else{
-					logger.log('error', err);
-					dcm_item_cb(null);
+							}
+						});
+	
+						logger.log('info', 'DCMSEND OK. ('+inputFile+')');
+					}else{
+						logger.log('error', err);
+						dcm_item_cb(null);
+					}
 				}
-			}
-		);
-	}, function done() {
-		dcm_cb(null);
-	});	
+			);
+		}, function done() {
+			dcm_cb(null);
+		});	
+	} catch (err) {
+		logger.log('error', 'Try Catch:' + err);
+	}
 }
 
 // Busca archivos PDF, DICOM, convierte y envia
@@ -313,7 +350,7 @@ function cleanup() {
 
 					if (now > endTime) {
 						fs.unlink(path.join(filesDir, file), function(err) {
-							if(err) logger.log('error', err);
+							if(err) logger.log('error', 'Unlink #7:' + err);
 						});
 					}
 				});
