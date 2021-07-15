@@ -17,6 +17,7 @@ const execFile = require('child_process').execFile;
 const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const { createLogger, format, transports } = require('winston');
+const { json } = require('express');
 const { combine, timestamp, label, printf } = format;
 
 const tmp = path.join(__dirname, 'tmp');
@@ -161,6 +162,8 @@ function PRE(files, pre_cb) {
 				let patientSexTag;
 				let studyIDTag;
 				let studyDateTag;
+				let studyDescription;
+				let documentTitle;
 
 				let dicomTags = [];
 
@@ -211,6 +214,18 @@ function PRE(files, pre_cb) {
 					studyDateTag = jsonData.StudyDate;
 					dicomTags.push('-i');
 					dicomTags.push("(0008,0020)="+studyDateTag);
+				}
+
+				if(jsonData.StudyDescription !== undefined) {
+					studyDescription = jsonData.StudyDescription;
+					dicomTags.push('-i');
+					dicomTags.push("(0008,1030)="+studyDescription);
+				}
+
+				if(jsonData.DocumentTitle !== undefined) {
+					documentTitle = jsonData.DocumentTitle;
+					dicomTags.push('-i');
+					dicomTags.push("(0042,0010)="+documentTitle);
 				}
 
 				dicomTags.push(inputFile);
@@ -438,6 +453,10 @@ app.post('/api/v1/convert', (req, res) => {
 		dicomFiltered.StudyDate = dicom.StudyDate;
 	}
 
+	if(dicom.DocumentTitle !== undefined) {
+		dicomFiltered.DocumentTitle = dicom.DocumentTitle;
+	}
+
 	if(dicom.PatientSex !== undefined) {
 		if(dicom.PatientSex === 'M' || dicom.PatientSex === 'F' || dicom.PatientSex === 'O') {
 			dicomFiltered.PatientSex = dicom.PatientSex;
@@ -447,6 +466,10 @@ app.post('/api/v1/convert', (req, res) => {
 			res.status(500).send(mes);
 			return;
 		}
+	}
+
+	if(dicom.StudyDescription !== undefined) {
+		dicomFiltered.StudyDescription = dicom.StudyDescription.slice(0, 64);
 	}
 
 	fs.writeFile(path.join(tmp, dicomFiltered.AccessionNumber + '.pdf'), base64PDF, {encoding: 'base64'}, function(err) {
